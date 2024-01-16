@@ -30,7 +30,7 @@ async def route_bar(image: bytes = File()) -> Response:
 
 
 @app.post("/deepcreampy-mosaic", summary="Decensor mosaics from an image.")
-async def route_bar(image: bytes = File(), masked: bytes = File()) -> Response:
+async def route_mosaic(image: bytes = File(), masked: bytes = File()) -> Response:
     image = Image.open(io.BytesIO(image))
     masked = Image.open(io.BytesIO(masked))
     result = decensor(image, masked, is_mosaic=True)
