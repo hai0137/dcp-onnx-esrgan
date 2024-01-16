@@ -1,8 +1,9 @@
 """
 Cleaned from: DeepCreamPy/decensor.py
 """
-
+import logging
 from multiprocessing.pool import ThreadPool
+from typing import Tuple
 
 import numpy as np
 from PIL import Image
@@ -13,6 +14,8 @@ from utils import image_to_array, expand_bounding
 
 # Green.
 MASK_COLOR = [0, 1, 0]
+
+logger = logging.getLogger('decensor')
 
 
 def find_mask(colored):
@@ -36,8 +39,43 @@ def find_regions(image, mask_color):
     return regions
 
 
-def decensor(ori: Image, colored: Image, is_mosaic: bool):
+def resize(img_array: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
+    pred_img = Image.fromarray(img_array.astype('uint8'))
+    pred_img = pred_img.resize(size, resample=Image.BICUBIC)
+    return image_to_array(pred_img)
+
+
+def resize_upscale(img_array: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
+    import cv2
+
+    from esrgan_runner import ImageInput, run_upscale
+
+    # Convert from BGR to RGB, resize, and then convert back to BGR
+    img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+
+    target_width, target_height = size
+    origin_height, origin_width = img_array.shape[:2]  # (height, width)
+    scale = target_height / origin_height
+    img = ImageInput(img_array, None)
+    out = run_upscale(img, scale)
+    out_img = out.output_img
+
+    out_height, out_width = out_img.shape[:2]
+    if abs(out_width - target_width) > 1:
+        out_img = cv2.resize(
+            out_img, dsize=(0, 0), fx=target_width / out_width, fy=1,
+            interpolation=cv2.INTER_AREA,
+        )
+
+    # convert back to BGR
+    out_img = cv2.cvtColor(out_img, cv2.COLOR_RGB2BGR)
+    return image_to_array(out_img)
+
+
+def decensor(original_image: Image, colored: Image, is_mosaic: bool) -> Image:
+    ori = original_image
     # save the alpha channel if the image has an alpha channel
+    alpha_channel = None
     has_alpha = False
     if ori.mode == "RGBA":
         has_alpha = True
@@ -58,9 +96,9 @@ def decensor(ori: Image, colored: Image, is_mosaic: bool):
 
     # colored image is only used for finding the regions
     regions = find_regions(colored.convert('RGB'), [v * 255 for v in MASK_COLOR])
-    print("Found {region_count} censored regions in this image!".format(region_count=len(regions)))
+    logger.debug(f"Found {len(regions)} censored regions in this image!")
     if len(regions) == 0 and not is_mosaic:
-        print("No green (0,255,0) regions detected! Make sure you're using exactly the right color.")
+        logger.info("No green (0,255,0) regions detected! Make sure you're using exactly the right color.")
         return ori
 
     def predict_region(region):
@@ -106,9 +144,9 @@ def decensor(ori: Image, colored: Image, is_mosaic: bool):
         bounding_height = bounding_box[3] - bounding_box[1]
 
         # convert np array to image
-        pred_img = Image.fromarray(pred_img_array.astype('uint8'))
-        pred_img = pred_img.resize((bounding_width, bounding_height), resample=Image.BICUBIC)
-        pred_img_array = image_to_array(pred_img)
+        # pred_img_array = resize(img_array=pred_img_array.astype('uint8'), size=(bounding_width, bounding_height))
+        pred_img_array = resize_upscale(img_array=pred_img_array.astype('uint8'),
+                                        size=(bounding_width, bounding_height))
 
         # Efficiently copy regions into output image.
         for (x, y) in region:
@@ -122,5 +160,6 @@ def decensor(ori: Image, colored: Image, is_mosaic: bool):
     if has_alpha:
         output_img_array = np.concatenate((output_img_array, alpha_channel), axis=2)
 
-    print("Decensored image. Returning it.")
-    return Image.fromarray(output_img_array.astype('uint8'))
+    merged_img = Image.fromarray(output_img_array.astype('uint8'))
+    merged_img.info = original_image.info
+    return merged_img
