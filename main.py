@@ -177,6 +177,9 @@ def run_all_variantion(decensor_input, decensor_input_original, decensor_output,
 
 
 if __name__ == '__main__':
+    # Download the models to models/ directory
+    # https://mega.nz/file/02gnyTzB#X_8IiHgq3TFbSSCPeEYuroAuBnm8auxj_ka6LWEjhZI
+
     # run_all_variantion(decensor_input_path, decensor_input_original_path, decensor_output_path, worker_count=2)
     while 1:
         run(decensor_input_path, decensor_input_original_path, decensor_output_path, variant_number=0, worker_count=2)
