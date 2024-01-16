@@ -1,0 +1,5 @@
+# Python 3.9
+# conda install Pillow==9.4.0 scikit-image>=0.21.0 onnxruntime>=1.15.0 numpy==1.26.0 scipy==1.11.4 -y
+tqdm
+numpy==1.26.0
+Pillow==9.4.0

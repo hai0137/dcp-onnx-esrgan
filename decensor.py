@@ -2,7 +2,6 @@
 Cleaned from: DeepCreamPy/decensor.py
 """
 
-import sys
 from multiprocessing.pool import ThreadPool
 
 import numpy as np
@@ -10,8 +9,6 @@ from PIL import Image
 from scipy.ndimage import measurements
 
 from predict import predict
-
-sys.path.append("DeepCreamPy/libs")
 from utils import image_to_array, expand_bounding
 
 # Green.
