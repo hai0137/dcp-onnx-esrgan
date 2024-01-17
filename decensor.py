@@ -72,6 +72,42 @@ def resize_upscale(img_array: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
     return image_to_array(out_img)
 
 
+def resize_down_up_scale(img_array: np.ndarray, size: Tuple[int, int], downscale=5.0) -> np.ndarray:
+    import cv2
+
+    from esrgan_runner import ImageInput, run_upscale, run_downscale
+
+    # Convert from BGR to RGB, resize, and then convert back to BGR
+    img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+
+    target_width, target_height = size
+
+    img = ImageInput(img_array, None)
+    # Downscale first
+    down_img = run_downscale(img, downscale)
+
+    if downscale > 4.0:  # middle upscale
+        down_img = run_upscale(down_img.to_input(), 4)
+
+    down_img_height, _ = down_img.output_img.shape[:2]
+
+    # Upscale
+    scale = target_height / down_img_height
+    out = run_upscale(down_img.to_input(), scale)
+    out_img = out.output_img
+
+    out_height, out_width = out_img.shape[:2]
+    if abs(out_width - target_width) > 1:
+        out_img = cv2.resize(
+            out_img, dsize=(0, 0), fx=target_width / out_width, fy=1,
+            interpolation=cv2.INTER_AREA,
+        )
+
+    # convert back to BGR
+    out_img = cv2.cvtColor(out_img, cv2.COLOR_RGB2BGR)
+    return image_to_array(out_img)
+
+
 def decensor(original_image: Image, colored: Image, is_mosaic: bool) -> Image:
     ori = original_image
     # save the alpha channel if the image has an alpha channel
